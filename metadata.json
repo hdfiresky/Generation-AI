@@ -1,0 +1,5 @@
+{
+  "name": "Generations AI Chat",
+  "description": "A chatbot that adapts its personality, slang, and conversation style based on different generational stereotypes (Gen Z, Millennials, Gen X, Baby Boomers) for both male and female personas. The entire UI theme dynamically changes to match the selected persona.",
+  "requestFramePermissions": []
+}
