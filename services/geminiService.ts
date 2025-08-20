@@ -17,6 +17,15 @@ if (!USE_BACKEND) {
   ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 }
 
+// --- Helper for Backend Auth ---
+const getAuthHeaders = (): HeadersInit => {
+  const token = localStorage.getItem('authToken');
+  return {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`
+  };
+};
+
 // --- Chat Session Management ---
 
 export const createChatSession = (persona: Pick<PersonaProfile, 'prompt'>): Chat | { prompt: string } => {
@@ -41,7 +50,7 @@ export const createChatSession = (persona: Pick<PersonaProfile, 'prompt'>): Chat
 export async function* streamChatWithBackend(prompt: string, history: Message[], message: string) {
     const response = await fetch(`${BACKEND_URL}/chat-stream`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ prompt, history, message }),
     });
 
@@ -60,6 +69,53 @@ export async function* streamChatWithBackend(prompt: string, history: Message[],
     }
 }
 
+// --- Observation Management (Backend Only) ---
+export const fetchObservations = async (): Promise<string[]> => {
+    try {
+        const response = await fetch(`${BACKEND_URL}/observations`, {
+            method: 'GET',
+            headers: getAuthHeaders(),
+        });
+        if (!response.ok) {
+            console.error('Failed to fetch observations');
+            return [];
+        }
+        const observations: { text: string }[] = await response.json();
+        return observations.map(obs => obs.text);
+    } catch (error) {
+        console.error('Error fetching observations:', error);
+        return [];
+    }
+};
+
+export const postObservation = async (observation: string): Promise<void> => {
+    try {
+        const response = await fetch(`${BACKEND_URL}/observations`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ text: observation }),
+        });
+        if (!response.ok) {
+            console.error('Failed to post observation');
+        }
+    } catch (error) {
+        console.error('Error posting observation:', error);
+    }
+};
+
+export const deleteObservations = async (): Promise<void> => {
+     try {
+        const response = await fetch(`${BACKEND_URL}/observations`, {
+            method: 'DELETE',
+            headers: getAuthHeaders(),
+        });
+        if (!response.ok) {
+            console.error('Failed to delete observations');
+        }
+    } catch (error) {
+        console.error('Error deleting observations:', error);
+    }
+};
 
 // --- Persona & Profile Generation ---
 
@@ -82,7 +138,7 @@ export const generatePersonaDetails = async (generation: Generation, gender: Gen
     if (USE_BACKEND) {
         const response = await fetch(`${BACKEND_URL}/generate-persona`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: getAuthHeaders(),
             body: JSON.stringify({ generation, gender }),
         });
         if (!response.ok) {
@@ -162,7 +218,7 @@ export const generateUserProfile = async (observations: string[]): Promise<strin
     if (USE_BACKEND) {
         const response = await fetch(`${BACKEND_URL}/generate-profile`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: getAuthHeaders(),
             body: JSON.stringify({ observations }),
         });
         if (!response.ok) {

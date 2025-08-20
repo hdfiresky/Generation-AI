@@ -2,6 +2,7 @@ import React from 'react';
 import { Theme } from '../types';
 import ProfileIcon from './icons/ProfileIcon';
 import EyeIcon from './icons/EyeIcon';
+import LogoutIcon from './icons/LogoutIcon';
 
 interface HeaderProps {
   theme: Theme;
@@ -9,9 +10,11 @@ interface HeaderProps {
   isGeneratingProfile: boolean;
   onShowObservations: () => void;
   observationCount: number;
+  onLogout: () => void;
+  isLoggedIn: boolean;
 }
 
-const Header: React.FC<HeaderProps> = ({ theme, onGenerateProfile, isGeneratingProfile, onShowObservations, observationCount }) => {
+const Header: React.FC<HeaderProps> = ({ theme, onGenerateProfile, isGeneratingProfile, onShowObservations, observationCount, onLogout, isLoggedIn }) => {
   return (
     <header className={`w-full p-4 ${theme.primary} shadow-md transition-colors duration-500`}>
       <div className="flex items-center justify-between gap-4 max-w-4xl mx-auto">
@@ -46,7 +49,7 @@ const Header: React.FC<HeaderProps> = ({ theme, onGenerateProfile, isGeneratingP
             >
                {isGeneratingProfile ? (
                 <>
-                  <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
@@ -59,6 +62,15 @@ const Header: React.FC<HeaderProps> = ({ theme, onGenerateProfile, isGeneratingP
                 </>
               )}
             </button>
+            {isLoggedIn && (
+                <button
+                onClick={onLogout}
+                title="Logout"
+                className={`flex items-center justify-center h-10 w-10 text-sm font-medium rounded-full transition-all duration-300 ${theme.primary} ${theme.text} hover:bg-white/20 active:brightness-95`}
+              >
+                <LogoutIcon className="w-5 h-5" />
+              </button>
+            )}
         </div>
       </div>
     </header>

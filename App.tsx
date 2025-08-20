@@ -6,7 +6,10 @@ import {
   generatePersonaDetails, 
   generateUserProfile,
   USE_BACKEND,
-  streamChatWithBackend
+  streamChatWithBackend,
+  fetchObservations,
+  postObservation,
+  deleteObservations,
 } from './services/geminiService';
 import { getObservations, saveObservation, clearObservations } from './utils/localStorage';
 import Header from './components/Header';
@@ -15,6 +18,7 @@ import ChatWindow from './components/ChatWindow';
 import MessageInput from './components/MessageInput';
 import ProfileModal from './components/ProfileModal';
 import ObservationsModal from './components/ObservationsModal';
+import Auth from './components/Auth';
 
 import { Chat } from '@google/genai';
 
@@ -38,14 +42,22 @@ const App: React.FC = () => {
   const [isObservationsModalOpen, setIsObservationsModalOpen] = useState<boolean>(false);
   const [observations, setObservations] = useState<string[]>([]);
 
-  useEffect(() => {
-    updateObservations();
-  }, []);
-  
-  const updateObservations = () => {
-    setObservations(getObservations());
-  };
+  // Token is now loaded from local storage, regardless of mode.
+  const [token, setToken] = useState<string | null>(localStorage.getItem('authToken'));
 
+  const updateObservations = useCallback(async () => {
+    if (USE_BACKEND && token) {
+      try {
+        const fetchedObservations = await fetchObservations();
+        setObservations(fetchedObservations);
+      } catch (error) {
+        console.error("Failed to fetch observations from backend:", error);
+      }
+    } else {
+      setObservations(getObservations());
+    }
+  }, [token]);
+  
   const initializeChat = useCallback(() => {
     console.log("Initializing chat for:", activeTheme.botName);
     setIsLoading(true);
@@ -72,8 +84,12 @@ const App: React.FC = () => {
   }, [activeTheme]);
 
   useEffect(() => {
-    initializeChat();
-  }, [initializeChat]);
+    // When a user is authenticated, initialize their chat and fetch their data.
+    if (token) {
+      initializeChat();
+      updateObservations();
+    }
+  }, [initializeChat, token, updateObservations]);
 
   const handleSendMessage = async (userMessage: string) => {
     if (!chatSession) return;
@@ -110,10 +126,10 @@ const App: React.FC = () => {
     };
 
     try {
-      if (USE_BACKEND && 'prompt' in chatSession) {
+      if (USE_BACKEND && chatSession && 'prompt' in chatSession) {
         const stream = streamChatWithBackend(chatSession.prompt, messages, userMessage);
         await processStream(stream);
-      } else if (!USE_BACKEND && 'sendMessageStream' in chatSession) {
+      } else if (!USE_BACKEND && chatSession && 'sendMessageStream' in chatSession) {
         const response = await (chatSession as Chat).sendMessageStream({ message: userMessage });
         await processStream(response);
       } else {
@@ -129,8 +145,12 @@ const App: React.FC = () => {
         try {
           const parsed = JSON.parse(jsonString);
           if (parsed.observation) {
-            saveObservation(parsed.observation);
-            updateObservations();
+            if (USE_BACKEND) {
+                await postObservation(parsed.observation);
+            } else {
+                saveObservation(parsed.observation);
+            }
+            await updateObservations(); // Refetch observations list
             console.log("Observation saved:", parsed.observation);
           }
           const cleanText = botResponseText.substring(0, jsonStartIndex).trim();
@@ -185,7 +205,7 @@ const App: React.FC = () => {
   };
 
   const handleGenerateProfile = async () => {
-    const currentObservations = getObservations();
+    const currentObservations = observations;
     if (currentObservations.length < 3) {
       alert("Not enough data to generate a profile yet. Keep chatting to gather more intelligence!");
       return;
@@ -204,17 +224,38 @@ const App: React.FC = () => {
     }
   };
 
-  const handleShowObservations = () => {
-    updateObservations();
+  const handleShowObservations = async () => {
+    await updateObservations(); // Ensure data is fresh before showing modal
     setIsObservationsModalOpen(true);
   };
 
-  const handleClearObservations = () => {
-    clearObservations();
-    updateObservations();
+  const handleClearObservations = async () => {
+    if (USE_BACKEND) {
+        await deleteObservations();
+    } else {
+        clearObservations();
+    }
+    await updateObservations();
     setIsObservationsModalOpen(false);
   };
 
+  const handleLoginSuccess = (newToken: string) => {
+    localStorage.setItem('authToken', newToken);
+    setToken(newToken);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('authToken');
+    setToken(null);
+    setMessages([]);
+    setObservations([]);
+    clearObservations();
+  };
+  
+  // The Auth component is now shown if there is no token, regardless of mode.
+  if (!token) {
+    return <Auth onLoginSuccess={handleLoginSuccess} />;
+  }
 
   return (
     <div className={`flex flex-col h-dvh w-full overflow-hidden ${activeTheme.font} ${activeTheme.bg} transition-all duration-500`}>
@@ -224,6 +265,8 @@ const App: React.FC = () => {
         isGeneratingProfile={isGeneratingProfile}
         onShowObservations={handleShowObservations}
         observationCount={observations.length}
+        onLogout={handleLogout}
+        isLoggedIn={!!token}
       />
       <PersonaSelector 
         selectedPersona={persona} 
